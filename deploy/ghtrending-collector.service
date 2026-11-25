@@ -1,0 +1,13 @@
+[Unit]
+Description=GitHub Trending One-Shot Collector
+Requires=docker.service
+After=docker.service network-online.target ghtrending.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ghtrending/deploy
+ExecStart=/usr/bin/docker compose --env-file /opt/ghtrending/backend/.env -f /opt/ghtrending/deploy/docker-compose.yml run --rm -T api python collector/run.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ghtrending-collector

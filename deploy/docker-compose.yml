@@ -1,0 +1,120 @@
+# GitHub Trending 生产部署编排文件
+# 架构策略：
+# - 自建 api 服务默认采用目标服务器本地 `docker compose build`（无需外部 Registry 推送权限，
+#   且在 Oracle Ampere A1 等 linux/arm64 或标准 linux/amd64 服务器上均可直接原生构建）。
+# - 官方基础镜像均锁定版本号且自带 multi-arch manifest（支持 linux/amd64 与 linux/arm64）；
+#   如目标主机需要强制指定架构，可在对应服务下取消注释 `platform: linux/arm64`（或 `linux/amd64`）。
+
+services:
+  postgres:
+    image: postgres:16.6-alpine3.21
+    # platform: linux/arm64  # multi-arch 兜底：Ampere A1 可取消注释强制指定 ARM64，x86_64 改为 linux/amd64
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ghtrending
+      POSTGRES_DB: ghtrending
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_STRONG_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghtrending -d ghtrending"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7.4.1-alpine3.20
+    # platform: linux/arm64  # multi-arch 兜底：official image 原生支持 amd64/arm64
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: ghtrending-api:0.1.0
+    restart: unless-stopped
+    env_file:
+      - path: ../backend/.env
+        required: false
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    # platform: linux/arm64  # multi-arch 兜底：official image 原生支持 amd64/arm64
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-trending.example.com}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:2019/config/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

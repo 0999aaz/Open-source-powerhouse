@@ -1,0 +1,23 @@
+{
+    email {$ACME_EMAIL}
+    log {
+        output stdout
+        format json
+    }
+}
+
+{$DOMAIN} {
+    encode zstd gzip
+
+    log {
+        output stdout
+        format json
+    }
+
+    reverse_proxy api:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

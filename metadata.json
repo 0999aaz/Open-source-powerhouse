@@ -1,0 +1,6 @@
+{
+  "name": "GitHub Trending 开源趋势浏览平台",
+  "description": "GitHub 热门仓库服务端采集缓存与 Android 离线浏览客户端",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,18 @@
+[Unit]
+Description=GitHub Trending Docker Compose Stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/ghtrending/deploy
+ExecStart=/usr/bin/docker compose --env-file /opt/ghtrending/backend/.env -f /opt/ghtrending/deploy/docker-compose.yml up -d --build
+ExecStop=/usr/bin/docker compose --env-file /opt/ghtrending/backend/.env -f /opt/ghtrending/deploy/docker-compose.yml down
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ghtrending-stack
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,37 @@
+# General / OS
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+!backend/.env.example
+.aistudio/
+
+# Node / Web
+node_modules/
+dist/
+coverage/
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+venv/
+.venv/
+env/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml
+*.jks
+*.keystore
+build/
+local.properties
